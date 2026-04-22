@@ -1,0 +1,60 @@
+name: PR Template Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  validate-pr:
+    name: Validate Pull Request Template
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+
+            const requiredSections = [
+              "## 📋 Summary",
+              "## 🧠 What was done",
+              "## 🤖 Copilot Checklist",
+              "## 🔍 Testing"
+            ];
+
+            const requiredCheckedBoxes = [
+              "- [x] Code reviewed with GitHub Copilot",
+              "- [x] No unnecessary complexity",
+              "- [x] Clear and readable code",
+              "- [x] Tested locally"
+            ];
+
+            let errors = [];
+
+            // 🔍 Check sections
+            const missingSections = requiredSections.filter(section => !body.includes(section));
+            if (missingSections.length > 0) {
+              errors.push(`Missing sections: ${missingSections.join(", ")}`);
+            }
+
+            // 🔍 Check checkboxes
+            const uncheckedBoxes = requiredCheckedBoxes.filter(box => !body.toLowerCase().includes(box.toLowerCase()));
+            if (uncheckedBoxes.length > 0) {
+              errors.push(`Unchecked required checkboxes: ${uncheckedBoxes.join(", ")}`);
+            }
+
+            if (errors.length > 0) {
+              const message = `❌ PR validation failed:\n\n${errors.join("\n")}`;
+
+              core.setFailed(message);
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: pr.number,
+                body: `⚠️ **PR Template Validation Failed**\n\n${errors.join("\n")}\n\nPlease complete the PR template properly.`
+              });
+            } else {
+              console.log("✅ PR template validation passed");
+            }
